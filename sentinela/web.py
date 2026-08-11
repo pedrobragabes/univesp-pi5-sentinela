@@ -41,8 +41,10 @@ def create_app(database_path: Path = DEFAULT_DATABASE, device_key: str | None = 
             return jsonify({"error": "Credencial do dispositivo inválida."}), 401
         try:
             reading = validate_payload(request.get_json(silent=True))
-        except (PayloadError, OverflowError, OSError) as error:
-            return jsonify({"error": str(error)}), 422
+        except PayloadError:
+            return jsonify({"error": "Leitura rejeitada pelo contrato de telemetria."}), 422
+        except (OverflowError, OSError):
+            return jsonify({"error": "Leitura inválida ou fora da faixa suportada."}), 422
 
         received_at = datetime.now(timezone.utc).isoformat()
         try:
