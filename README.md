@@ -1,10 +1,23 @@
 # Sentinela — PI V
 
+[![CI](https://github.com/pedrobragabes/univesp-pi5-sentinela/actions/workflows/ci.yml/badge.svg)](https://github.com/pedrobragabes/univesp-pi5-sentinela/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/pedrobragabes/univesp-pi5-sentinela/actions/workflows/codeql.yml/badge.svg)](https://github.com/pedrobragabes/univesp-pi5-sentinela/actions/workflows/codeql.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Estação experimental de telemetria ambiental que integra **ESP32 + DHT22**, tratamento inicial do sinal, comunicação HTTP, ingestão autenticada, SQLite e painel responsivo.
 
 O projeto é uma fundação para o **Projeto Integrador em Computação V (PJI510)** ou **Projeto Integrador Extensionista V**, conforme a matriz vigente na matrícula. Ele cobre o núcleo comum dos PPCs de 2025 e 2026: integração hardware/software, sistemas embarcados, aquisição e tratamento de dados, comunicação, conectividade, interface, testes e controle de versão.
 
 > **Limite de validação:** o firmware compila para a placa `esp32dev`, o protocolo e o serviço foram testados com simulador, mas nenhum ESP32 ou sensor físico foi conectado nesta etapa. Montagem, calibração, consumo e ensaio de campo permanecem pendentes e não são apresentados como concluídos.
+
+## Estado
+
+| Dimensão | Situação |
+|---|---|
+| fundação de software | concluída, com 6 testes Python, testes C++ e build ESP32 na CI |
+| versão | `v0.1.0-foundation` |
+| hardware | bloqueado: nenhuma placa ESP32 foi detectada nesta estação de trabalho |
+| entrega acadêmica | pendente de parceiro, bancada, calibração, ensaio, relatório e vídeo |
 
 ## Entrega técnica atual
 
@@ -99,4 +112,8 @@ A demonstração usa HTTP local. Não envie a chave nem telemetria por uma rede 
 5. registrar evidências reais de bancada e devolutiva;
 6. produzir relatório e vídeo conforme o calendário da disciplina.
 
-Consulte também o [contrato de telemetria](docs/01-protocolo.md), o [guia de montagem](docs/02-montagem.md) e a [revisão de código](docs/04-revisao-de-codigo.md).
+Consulte também o [contrato de telemetria](docs/01-protocolo.md), o [guia de montagem](docs/02-montagem.md), o [plano de validação física](docs/03-validacao-fisica.md), a [revisão de código](docs/04-revisao-de-codigo.md), o [modelo de relatório parcial](docs/05-relatorio-parcial.md) e o [modelo de relatório final](docs/06-relatorio-final.md).
+
+## Governança e licença
+
+As atividades devem ser acompanhadas por issues e milestones alinhados ao AVA. Consulte [SECURITY.md](SECURITY.md). Código e firmware usam [licença MIT](LICENSE); medições e evidências do parceiro exigem autorização própria.
