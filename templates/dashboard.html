@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Painel experimental de telemetria ambiental Sentinela.">
+  <title>Sentinela | Telemetria ambiental</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <a class="skip" href="#conteudo">Pular para o conteúdo</a>
+  <header><a class="brand" href="/"><span class="pulse"></span> SENTINELA</a><span>PI V / NÓ AMBIENTAL</span></header>
+  <main id="conteudo">
+    <section class="hero">
+      <p class="eyebrow">Monitoramento experimental</p>
+      <h1>O ambiente<br><em>deixa sinais.</em></h1>
+      <p class="intro">Aquisição, filtragem e transmissão de temperatura e umidade com origem e estado visíveis.</p>
+      <div class="notice"><strong>PROTÓTIPO NÃO CERTIFICADO</strong><span>Não utilizar para saúde, segurança ou controle de cargas.</span></div>
+    </section>
+    {% if development_key %}<p class="dev-warning"><strong>Configuração local:</strong> altere <code>SENTINELA_DEVICE_KEY</code> antes de qualquer implantação.</p>{% endif %}
+    <section aria-labelledby="dispositivos">
+      <div class="section-title"><p class="eyebrow">Agora</p><h2 id="dispositivos">Dispositivos</h2></div>
+      {% if devices %}<div class="devices">{% for device in devices %}
+        <article class="device">
+          <div class="device-head"><strong>{{ device.device_id }}</strong><span class="status {{ 'online' if device.online else 'offline' }}">{{ 'online' if device.online else 'sem sinal' }}</span></div>
+          <div class="readings"><div><b>{{ '%.1f'|format(device.temperature_c_filtered) }}°</b><span>temperatura filtrada</span></div><div><b>{{ '%.1f'|format(device.humidity_pct_filtered) }}%</b><span>umidade filtrada</span></div></div>
+          <p>RSSI {{ device.rssi_dbm|int }} dBm · recebido há {{ device.age_seconds }} s</p>
+        </article>
+      {% endfor %}</div>{% else %}<div class="empty"><strong>Nenhum sinal recebido.</strong><p>Execute o simulador ou conecte um nó configurado para iniciar a série.</p></div>{% endif %}
+    </section>
+    <section class="history" aria-labelledby="historico">
+      <div class="section-title"><p class="eyebrow">Rastreabilidade</p><h2 id="historico">Últimas leituras</h2></div>
+      <div class="table-wrap"><table><thead><tr><th>Dispositivo</th><th>Sequência</th><th>Temperatura</th><th>Umidade</th><th>RSSI</th><th>Observado em</th></tr></thead><tbody>{% for reading in readings %}<tr><td>{{ reading.device_id }}</td><td>{{ reading.sequence }}</td><td>{{ reading.temperature_c_raw }} → <strong>{{ reading.temperature_c_filtered }} °C</strong></td><td>{{ reading.humidity_pct_raw }} → <strong>{{ reading.humidity_pct_filtered }}%</strong></td><td>{{ reading.rssi_dbm }} dBm</td><td>{{ reading.observed_at }}</td></tr>{% else %}<tr><td colspan="6">Aguardando telemetria.</td></tr>{% endfor %}</tbody></table></div>
+    </section>
+  </main>
+  <footer><strong>Sentinela / bancada digital</strong><span>Dados simulados ou experimentais devem ser identificados.</span></footer>
+</body>
+</html>
