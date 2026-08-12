@@ -81,6 +81,7 @@ O `local_config.h` contém segredos locais e é ignorado pelo Git. O perfil sem 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 .\.venv\Scripts\python.exe -m pip check
+.\.venv\Scripts\python.exe -m compileall -q sentinela simulator tests
 .\.venv\Scripts\pio.exe test -d firmware -e native
 .\.venv\Scripts\pio.exe run -d firmware -e esp32dev
 ```
