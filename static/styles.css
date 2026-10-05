@@ -1,4 +1,4 @@
-:root { --ink:#101512; --paper:#e8e9df; --green:#00c778; --orange:#ff5b2d; --muted:#667068; --line:1px solid #101512; --mono:"Cascadia Mono","IBM Plex Mono",monospace; --sans:Inter,"Segoe UI",sans-serif; }
+:root { --ink:#101512; --paper:#e8e9df; --green:#00c778; --orange:#c44621; --muted:#667068; --line:1px solid #101512; --mono:"Cascadia Mono","IBM Plex Mono",monospace; --sans:Inter,"Segoe UI",sans-serif; }
 * { box-sizing:border-box; }
 body { margin:0; color:var(--ink); background:var(--paper); font-family:var(--sans); }
 a { color:inherit; }
@@ -22,13 +22,16 @@ h1 em { color:var(--orange); font-style:normal; }
 h2 { font-size:clamp(3rem,7vw,6rem); }
 .devices { display:grid; grid-template-columns:repeat(2,1fr); gap:1rem; }
 .device,.empty { padding:1.5rem; background:white; border:var(--line); box-shadow:6px 6px 0 var(--ink); }
-.device-head { display:flex; justify-content:space-between; gap:1rem; font-family:var(--mono); }
+.device-head { display:flex; flex-wrap:wrap; justify-content:space-between; gap:1rem; font-family:var(--mono); }
+.device-head strong { min-width:0; max-width:100%; overflow-wrap:anywhere; }
 .status { padding:.25rem .5rem; color:white; font-size:.68rem; text-transform:uppercase; background:var(--orange); }
 .status.online { color:var(--ink); background:var(--green); }
 .readings { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin:2rem 0; }
 .readings b { display:block; font-size:clamp(3rem,7vw,5.8rem); letter-spacing:-.08em; }
 .readings span { display:block; color:var(--muted); font:700 .65rem var(--mono); text-transform:uppercase; }
 .device p { margin:0; color:var(--muted); font:700 .72rem var(--mono); }
+.device .observation { margin-top:.75rem; }
+.device .observation.stale { color:#a72c16; }
 .history { padding-bottom:6rem; }
 .table-wrap { overflow-x:auto; border:var(--line); background:white; }
 table { width:100%; min-width:850px; border-collapse:collapse; }
@@ -38,3 +41,4 @@ td { font-family:var(--mono); font-size:.78rem; }
 code { font-family:var(--mono); }
 footer { display:flex; justify-content:space-between; gap:2rem; padding:2rem clamp(1rem,5vw,5rem); color:white; background:var(--ink); font-size:.75rem; }
 @media (max-width:760px) { .notice { position:static; margin-top:2rem; transform:none; } .devices { grid-template-columns:1fr; } .readings { grid-template-columns:1fr 1fr; } .readings b { font-size:2.6rem; } footer { flex-direction:column; } header>span { display:none; } }
+@media (max-width:400px) { h1 { font-size:clamp(3.2rem,15vw,4.5rem); } .section-title { flex-direction:column; align-items:flex-start; gap:.75rem; } }
