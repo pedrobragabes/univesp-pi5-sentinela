@@ -6,3 +6,6 @@ sentinela.db
 firmware/.pio/
 firmware/include/local_config.h
 .pytest_cache/
+node_modules/
+test-results/
+playwright-report/

@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import hmac
 import os
-import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request
+from werkzeug.exceptions import RequestEntityTooLarge
 
 from sentinela.database import connect, initialize
 from sentinela.validation import PayloadError, validate_payload
@@ -23,8 +23,13 @@ def create_app(database_path: Path = DEFAULT_DATABASE, device_key: str | None = 
         static_folder=str(ROOT / "static"),
     )
     app.config["DATABASE"] = Path(database_path)
+    app.config["MAX_CONTENT_LENGTH"] = 4096
     app.config["DEVICE_KEY"] = device_key or os.getenv("SENTINELA_DEVICE_KEY", DEFAULT_DEVELOPMENT_KEY)
     initialize(app.config["DATABASE"])
+
+    @app.errorhandler(RequestEntityTooLarge)
+    def oversized_body(_error):
+        return jsonify({"error": "Mensagem excede o limite de 4096 bytes."}), 413
 
     @app.after_request
     def security_headers(response):
@@ -37,42 +42,56 @@ def create_app(database_path: Path = DEFAULT_DATABASE, device_key: str | None = 
     @app.post("/api/v1/readings")
     def receive_reading():
         supplied_key = request.headers.get("X-Device-Key", "")
-        if not hmac.compare_digest(supplied_key, app.config["DEVICE_KEY"]):
+        if not hmac.compare_digest(supplied_key.encode("utf-8"), app.config["DEVICE_KEY"].encode("utf-8")):
             return jsonify({"error": "Credencial do dispositivo inválida."}), 401
         try:
-            reading = validate_payload(request.get_json(silent=True))
+            payload = request.get_json(silent=True)
+            reading = validate_payload(payload, check_freshness=False)
+            received_at = datetime.now(timezone.utc).isoformat()
+            with connect(app.config["DATABASE"]) as connection:
+                # Reserve the write transaction before looking up the identity.
+                # Concurrent deliveries cannot both accept different contents.
+                connection.execute("BEGIN IMMEDIATE")
+                previous = connection.execute(
+                    "SELECT * FROM readings WHERE device_id = ? AND boot_id = ? AND sequence = ?",
+                    (reading["device_id"], reading["boot_id"], reading["sequence"]),
+                ).fetchone()
+                if previous is not None:
+                    if any(previous[field] != value for field, value in reading.items()
+                           if field != "schema_version"):
+                        return jsonify({"status": "conflict", "error": "Sequência já utilizada por outra leitura."}), 409
+                    reading_id = previous["id"]
+                    status, code = "duplicate", 200
+                else:
+                    # A stored exact retry remains valid after the clock window;
+                    # a new observation must still satisfy the 24-hour limit.
+                    validate_payload(payload)
+                    columns = [field for field in reading if field != "schema_version"]
+                    cursor = connection.execute(
+                        "INSERT INTO readings (" + ", ".join(columns) + ", received_at) "
+                        "VALUES (" + ", ".join("?" for _ in columns) + ", ?)",
+                        tuple(reading[field] for field in columns) + (received_at,),
+                    )
+                    reading_id = cursor.lastrowid
+                    status, code = "accepted", 201
         except PayloadError:
             return jsonify({"error": "Leitura rejeitada pelo contrato de telemetria."}), 422
         except (OverflowError, OSError):
             return jsonify({"error": "Leitura inválida ou fora da faixa suportada."}), 422
 
-        received_at = datetime.now(timezone.utc).isoformat()
-        try:
-            with connect(app.config["DATABASE"]) as connection:
-                cursor = connection.execute(
-                    """INSERT INTO readings (
-                        device_id, boot_id, sequence, observed_at, received_at,
-                        temperature_c_raw, temperature_c_filtered,
-                        humidity_pct_raw, humidity_pct_filtered, rssi_dbm
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (
-                        reading["device_id"], reading["boot_id"], reading["sequence"],
-                        reading["observed_at"], received_at,
-                        reading["temperature_c_raw"], reading["temperature_c_filtered"],
-                        reading["humidity_pct_raw"], reading["humidity_pct_filtered"], reading["rssi_dbm"],
-                    ),
-                )
-                reading_id = cursor.lastrowid
-        except sqlite3.IntegrityError:
-            return jsonify({"status": "duplicate"}), 200
-        return jsonify({"id": reading_id, "status": "accepted"}), 201
+        return jsonify({"id": reading_id, "status": status,
+                        "device_id": reading["device_id"], "boot_id": reading["boot_id"],
+                        "sequence": reading["sequence"]}), code
 
     def dashboard_data() -> tuple[list[dict], list[dict]]:
         with connect(app.config["DATABASE"]) as connection:
             latest = connection.execute(
-                """SELECT r.* FROM readings r
-                JOIN (SELECT device_id, MAX(id) AS id FROM readings GROUP BY device_id) last
-                ON r.id = last.id ORDER BY r.device_id"""
+                """SELECT * FROM (
+                    SELECT r.*, MAX(received_at) OVER (PARTITION BY device_id) AS last_received_at,
+                    ROW_NUMBER() OVER (PARTITION BY device_id
+                        ORDER BY observed_at DESC, received_at DESC, id DESC) AS observation_rank
+                    FROM readings r
+                ) WHERE observation_rank = 1 ORDER BY device_id"""
             ).fetchall()
             readings = connection.execute(
                 "SELECT * FROM readings ORDER BY id DESC LIMIT 30"
@@ -81,9 +100,13 @@ def create_app(database_path: Path = DEFAULT_DATABASE, device_key: str | None = 
         devices = []
         for row in latest:
             item = dict(row)
-            age_seconds = max(0, int((now - datetime.fromisoformat(item["received_at"])).total_seconds()))
+            item.pop("observation_rank")
+            age_seconds = max(0, int((now - datetime.fromisoformat(item["last_received_at"])).total_seconds()))
+            observation_age = int((now - datetime.fromisoformat(item["observed_at"])).total_seconds())
             item["age_seconds"] = age_seconds
             item["online"] = age_seconds <= 120
+            item["observation_age_seconds"] = observation_age
+            item["fresh"] = abs(observation_age) <= 120
             devices.append(item)
         return devices, [dict(row) for row in readings]
 
@@ -100,7 +123,5 @@ def create_app(database_path: Path = DEFAULT_DATABASE, device_key: str | None = 
     return app
 
 
-app = create_app()
-
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=3004, debug=False)
+    create_app().run(host="127.0.0.1", port=3004, debug=False)

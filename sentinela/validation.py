@@ -33,7 +33,7 @@ def _number(payload: dict, field: str, minimum: float, maximum: float) -> float:
     return float(value)
 
 
-def validate_payload(payload: object, now: datetime | None = None) -> dict:
+def validate_payload(payload: object, now: datetime | None = None, *, check_freshness: bool = True) -> dict:
     if not isinstance(payload, dict):
         raise PayloadError("O corpo deve ser um objeto JSON.")
     missing = REQUIRED_FIELDS - payload.keys()
@@ -42,7 +42,7 @@ def validate_payload(payload: object, now: datetime | None = None) -> dict:
         raise PayloadError(f"Campos obrigatórios ausentes: {', '.join(sorted(missing))}.")
     if unknown:
         raise PayloadError(f"Campos desconhecidos: {', '.join(sorted(unknown))}.")
-    if payload["schema_version"] != 1:
+    if type(payload["schema_version"]) is not int or payload["schema_version"] != 1:
         raise PayloadError("schema_version incompatível.")
     if not isinstance(payload["device_id"], str) or not DEVICE_PATTERN.fullmatch(payload["device_id"]):
         raise PayloadError("device_id inválido.")
@@ -58,7 +58,7 @@ def validate_payload(payload: object, now: datetime | None = None) -> dict:
         raise PayloadError("observed_at está fora da faixa suportada.")
     clock = now or datetime.now(timezone.utc)
     observed = datetime.fromtimestamp(observed_at, timezone.utc)
-    if abs((clock - observed).total_seconds()) > 86_400:
+    if check_freshness and abs((clock - observed).total_seconds()) > 86_400:
         raise PayloadError("observed_at está fora da janela de 24 horas.")
 
     cleaned = {

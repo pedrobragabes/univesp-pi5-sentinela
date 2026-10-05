@@ -14,21 +14,21 @@ O projeto é uma fundação para o **Projeto Integrador em Computação V (PJI51
 
 | Dimensão | Situação |
 |---|---|
-| fundação de software | concluída, com 6 testes Python, testes C++ e build ESP32 na CI |
-| versão | `v0.1.0-foundation` |
+| fundação de software | revisada, com 17 testes Python, 7 casos C++, 9 testes de navegador e build ESP32 na CI |
+| versão | `0.1.1` (revisão técnica; sem validação física) |
 | hardware | bloqueado: nenhuma placa ESP32 foi detectada nesta estação de trabalho |
 | entrega acadêmica | pendente de parceiro, bancada, calibração, ensaio, relatório e vídeo |
 
 ## Entrega técnica atual
 
-- firmware Arduino para ESP32 com leitura DHT22 a cada 30 segundos;
+- firmware Arduino para ESP32 com ciclo de 30 segundos; a aquisição pausa enquanto há uma leitura aguardando confirmação;
 - rejeição de valores fisicamente inválidos;
 - média móvel exponencial, com `alpha = 0,25`, aplicada no dispositivo;
 - sincronização UTC por NTP e reconexão Wi-Fi;
 - mensagem JSON versionada com identificação de boot e sequência;
 - receptor Flask autenticado por chave de dispositivo;
-- validação estrita, janela temporal e deduplicação no SQLite;
-- estado online/sem sinal e últimas leituras no painel;
+- validação estrita, janela temporal e repetição idempotente no SQLite; dados diferentes com a mesma identidade recebem HTTP 409;
+- estado de entrega online/sem sinal, idade da observação e relógio adiantado no painel; a observação mais recente prevalece sobre entregas atrasadas;
 - simulador determinístico para testar o sistema sem hardware;
 - testes Python, testes nativos da lógica C++ e build ESP32 na CI.
 
@@ -81,11 +81,22 @@ O `local_config.h` contém segredos locais e é ignorado pelo Git. O perfil sem 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 .\.venv\Scripts\python.exe -m pip check
+.\.venv\Scripts\python.exe -m compileall -q sentinela simulator scripts tests
 .\.venv\Scripts\pio.exe test -d firmware -e native
 .\.venv\Scripts\pio.exe run -d firmware -e esp32dev
 ```
 
-O teste nativo C++ exige `gcc/g++` no computador. A CI executa essa etapa no Linux. Neste Windows, foram aprovados 6 testes Python e a compilação ESP32; o teste C++ local ficou indisponível por ausência do compilador nativo.
+O teste nativo C++ exige `gcc/g++`; sua execução fica na CI Linux. Neste Windows passaram 17 testes Python e o build ESP32 (47.380 bytes de RAM e 927.885 bytes de aplicação). O compilador nativo continua ausente. Os 7 casos C++ incluem confirmação JSON correlacionada e preservação do mesmo corpo após perda da resposta.
+
+Para verificar o painel, instale Node.js 22 ou superior e as dependências Python acima:
+
+```powershell
+npm ci
+npx playwright install chromium
+npm run test:e2e
+```
+
+Os 9 testes cobrem três larguras (1440, 390 e 320 px), estados recente/antigo/sem sinal/relógio adiantado, navegação sem JavaScript e foco por teclado. As seis análises Axe dos estados preenchido/vazio não tiveram violações. A fixture usa somente dados sintéticos em banco temporário e escuta em `127.0.0.1:3486`.
 
 ## Estrutura
 
@@ -98,6 +109,12 @@ static/      estilos responsivos
 tests/       testes de protocolo e integração
 docs/        contrato, montagem, validação e revisão
 ```
+
+## Limites de retransmissão
+
+O dispositivo mantém **uma leitura imutável em RAM** e repete exatamente o mesmo JSON até receber HTTP 201/`accepted` ou HTTP 200/`duplicate`, com `id`, dispositivo, boot e sequência correspondentes. Um HTTP 200 genérico, JSON inválido, resposta de outra sequência ou HTTP 409 não libera a leitura. Enquanto ela está pendente não são adquiridas novas amostras nem atualizado o filtro: a cadência de aquisição fica menor durante indisponibilidade.
+
+A memória não sobrevive a reinicializações; uma fila persistente continua pendente. Uma leitura nova com mais de 24 horas é rejeitada; uma repetição idêntica de uma leitura já armazenada pode ser confirmada após essa janela. Um conflito ou rejeição permanente exige investigar o contrato/configuração antes de reiniciar, registrando a perda da leitura pendente. O painel calcula `online` pela última entrega **armazenada** há até 120 s; isso não prova conexão contínua nem qualidade da medição.
 
 ## Segurança e implantação
 

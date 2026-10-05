@@ -49,7 +49,7 @@ Foi adicionada uma faixa absoluta antes da conversão de época, além da janela
 
 Valores fora de 0 a 1 poderiam amplificar o sinal. O construtor agora restringe o coeficiente à faixa válida e há teste C++ específico.
 
-## Evidências verificadas
+## Evidências da fundação anterior
 
 - 6 testes Python aprovados;
 - dependências Python consistentes;
@@ -65,9 +65,45 @@ Valores fora de 0 a 1 poderiam amplificar o sinal. O construtor agora restringe 
 - teste C++ nativo não executado neste Windows por ausência de `gcc/g++`; ficará obrigatório na CI Linux;
 - comunicação HTTP é somente para rede local de demonstração;
 - chave compartilhada única é insuficiente para frota ou produção;
-- não há fila persistente no ESP32: amostras não confirmadas são tentadas novamente apenas no próximo ciclo;
+- não há fila persistente no ESP32: a leitura pendente é preservada em RAM e a aquisição pausa até confirmação; reinicialização perde essa leitura;
 - DHT22 e ESP32 não foram conectados, calibrados ou ensaiados fisicamente;
 - o servidor Flask de desenvolvimento não é configuração de produção.
+
+## Revisão de retransmissão — 5 de outubro de 2026
+
+### R7 — perda de resposta provocava nova leitura com a mesma sequência
+
+O firmware adquiria novos valores e timestamp antes de confirmar a sequência anterior. O receptor aceitava a colisão como duplicata. Agora há um slot imutável em RAM; o próximo ciclo repete seu corpo e a aquisição/filtro só avançam após um recibo correlacionado.
+
+### R8 — qualquer violação de integridade era confirmada como duplicata
+
+O receptor agora reserva uma transação, compara a leitura existente e devolve 409 para qualquer diferença normalizada. Foram reproduzidas colisões em seis campos e duas entregas concorrentes; somente uma observação fica armazenada. Uma repetição após reiniciar mantém o ID do recibo. Repetição já armazenada não expira com a janela de entrada de leituras novas.
+
+### R9 — HTTP 200 genérico liberava a sequência
+
+O firmware exige JSON válido com ID positivo, status correspondente ao HTTP, dispositivo, boot e sequência exatos. Recibos têm limite de 1024 bytes e tamanho conhecido. Os casos C++ cobrem HTML, JSON malformado, identidade incorreta, sequência booleana/fracionária, status trocado e resposta excessiva.
+
+### R10 — entregas atrasadas apareciam como observação atual
+
+O painel seleciona pelo instante observado e distingue idade da observação de idade da última entrega armazenada. Também identifica relógio adiantado, sem atribuir precisão ou certificação ao sensor.
+
+### R11 — entradas de autenticação e versão causavam comportamento incorreto
+
+Chave incorreta com caracteres não ASCII retorna 401 controlado, em vez de 500. A versão deve ser um inteiro; `true` e `1.0` são rejeitados. Corpos maiores que 4096 bytes recebem 413. Importar a factory não cria banco implicitamente.
+
+### R12 — painel apresentava contraste e rolagem por teclado insuficientes
+
+O tom laranja foi ajustado; a tabela ganhou região focável com nome próprio. Cabeçalhos e identificadores de até 40 caracteres se adaptam a 320 px. O atalho foca o conteúdo inclusive sem JavaScript.
+
+### Verificação desta revisão
+
+- 17 testes Python aprovados no Windows;
+- build ESP32 aprovado: 47.380 bytes de RAM e 927.885 bytes de aplicação;
+- 9 testes Playwright aprovados; seis análises Axe sem violações;
+- capturas em 1440 e 320 px inspecionadas;
+- auditorias das dependências Python, incluindo PlatformIO 6.2.0, e Node sem vulnerabilidades conhecidas;
+- 7 casos C++ nativos obrigatórios na CI Linux; execução local indisponível por ausência de gcc/g++;
+- nenhuma medição física, carga em placa ou validação do parceiro executada nesta revisão.
 
 ## Parecer
 

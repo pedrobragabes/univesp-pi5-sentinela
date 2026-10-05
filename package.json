@@ -1,0 +1,12 @@
+{
+  "name": "pi5-sentinela-browser-checks",
+  "version": "0.1.1",
+  "private": true,
+  "type": "module",
+  "scripts": { "test:e2e": "playwright test" },
+  "engines": { "node": ">=22" },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@axe-core/playwright": "4.13.0"
+  }
+}
